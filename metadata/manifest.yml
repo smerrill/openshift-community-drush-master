@@ -1,0 +1,20 @@
+---
+Name: drushmaster
+Cartridge-Short-Name: DRUSHMASTER
+Architecture: noarch
+Display-Name: Drush (git)
+Description: Utility
+Version: '0.0.1'
+Cartridge-Version: 0.0.1
+Cartridge-Vendor: phase2
+License: BSD
+Categories:
+- embedded
+Provides:
+- drush-7.0
+- drush
+- drush version() = 7.0
+- drush version() = 7
+Scaling:
+  Min: 1
+  Max: 1
