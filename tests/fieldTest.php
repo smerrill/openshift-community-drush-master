@@ -1,16 +1,21 @@
 <?php
 
+namespace Unish;
+
 /**
- * @file
- *   Tests for field.drush.inc
+ * Tests for field.drush.inc
  *
  * @group commands
  */
-class fieldCase extends Drush_CommandTestCase {
+class fieldCase extends CommandUnishTestCase {
 
   public function testField() {
     if (UNISH_DRUPAL_MAJOR_VERSION == 6) {
       $this->markTestSkipped("Field API not available in Drupal 6.");
+    }
+
+    if (UNISH_DRUPAL_MAJOR_VERSION == 8) {
+      $this->markTestSkipped("Field commands are not yet ported to D8.");
     }
 
     $sites = $this->setUpDrupal(1, TRUE);

@@ -6,23 +6,40 @@
  */
 
 /**
+ * Implements hook_drush_help_alter().
+ */
+function test_drush_help_alter(&$command) {
+  if (drush_drupal_major_version() >= 8) {
+    if ($command['command'] == 'test-run') {
+      foreach ($command['examples'] as $key => $value) {
+        $newkey = str_replace('BootstrapPageCacheTestCase', 'Drupal\system\Tests\Bootstrap\PageCacheTest', $key);
+        if ($newkey != $key) {
+          $command['examples'][$newkey] = $value;
+          unset($command['examples'][$key]);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Implementation of hook_drush_command().
  */
 function test_drush_command() {
   $items = array();
 
   $items['test-run'] = array(
-    'description' => "Run tests. Note that you must use the --uri option.",
+    'description' => "Run tests. Note that you must use the --uri option via the CLI or via a site alias.",
     'arguments' => array(
       'targets' => 'A test class, a test group. If omitted, a list of test classes and test groups is presented. Delimit multiple targets using commas.',
     ),
     'examples' => array(
       'test-run' => 'List all available classes and groups.',
       'sudo -u apache test-run --all' => 'Run all available tests. Avoid permission related failures by running as web server user.',
-      'test-run XMLRPCBasicTestCase' => 'Run one test class.',
-      'test-run XML-RPC' => 'Run all classes in a XML-RPC group.',
-      'test-run XML-RPC,Filter' => 'Run all tests from multiple groups/classes.',
-      'test-run XMLRPCBasicTestCase --methods="testListMethods, testInvalidMessageParsing"' => 'Run particular methods in the specified class or group.',
+      'test-run BootstrapPageCacheTestCase' => 'Run one test class.',
+      'test-run Bootstrap' => 'Run all classes in a XML-RPC group.',
+      'test-run Bootstrap,Filter' => 'Run all tests from multiple groups/classes.',
+      'test-run BootstrapPageCacheTestCase --methods="testPageCompression, testPageCache"' => 'Run particular methods in the specified class or group.',
     ),
     'options' => array(
       'all' => 'Run all available tests',
@@ -45,6 +62,7 @@ function test_drush_command() {
     // cache the lists of tests, file_prepare_directory(), variable lookup like
     // httpauth creds, copy pre-built registry table from testing side, etc.
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL,
+    'drupal dependencies' => array('simpletest'),
   );
   $items['test-clean'] = array(
     'description' => "Clean temporary tables and files.",
@@ -89,7 +107,7 @@ function drush_test_run_validate($specs = NULL) {
  */
 function drush_test_run($specs = NULL) {
   if (drush_drupal_major_version() > 7) {
-    cache()->delete('simpletest');
+    // \Drupal::cache('simpletest')->delete();
   }
   else {
     cache_clear_all('simpletest', 'cache');
@@ -157,6 +175,7 @@ function drush_test_run_class($class) {
  * Run a single test and display any failure messages.
  */
 function simpletest_drush_run_test($class) {
+  drush_log(dt('Starting test @test.', array('@test' => $class)), 'ok');
   if (drush_drupal_major_version() >= 7) {
     $test_id = db_insert('simpletest_test_id')
     ->useDefaults(array('test_id'))
@@ -186,6 +205,31 @@ function simpletest_drush_run_test($class) {
   $test_suites = drush_test_get_results($test_id, $info);
   if ($dir = drush_get_option('xml')) {
     drush_test_xml_results($test_id, $test_suites, $dir);
+  }
+  if ($status === 'error') {
+    if (drush_drupal_major_version() >= 7) {
+      $args = array(':test_id' => $test_id);
+      $result = db_query("SELECT * FROM {simpletest} WHERE test_id = :test_id AND status IN ('exception', 'fail') ORDER BY test_class, message_id", $args);
+      foreach ($result as $record) {
+        drush_set_error('DRUSH_TEST_FAIL', dt("Test !function failed: !message in !file on line !line", array(
+          '!function' => $record->function,
+          '!message' => $record->message,
+          '!file' => $record->file,
+          '!line' => $record->line,
+        )));
+      }
+    }
+    else {
+      $result = db_query("SELECT * FROM {simpletest} WHERE test_id = %d AND status IN ('exception', 'fail') ORDER BY test_class, message_id", $test_id);
+      while ($row = db_fetch_object($result)) {
+        drush_set_error('DRUSH_TEST_FAIL', dt("Test !function failed: !message in !file on line !line", array(
+          '!function' => $row->function,
+          '!message' => $row->message,
+          '!file' => $row->file,
+          '!line' => $row->line,
+        )));
+      }
+    }
   }
 }
 

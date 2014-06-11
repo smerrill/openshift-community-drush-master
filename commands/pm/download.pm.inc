@@ -136,6 +136,8 @@ function drush_pm_download() {
     $request['full_project_path'] = $request['base_project_path'] .'/'. $request['project_dir'];
     drush_log(dt('Downloading project !name to !dir ...', array('!name' => $request['name'], '!dir' => $request['base_project_path'])));
     if (!package_handler_download_project($request, $release)) {
+      // Delete the cached updatexml since it may be invalid.
+      drush_delete_dir(drush_download_file_name(updatexml_get_url($request)), TRUE);
       drush_log(dt('Error downloading !name', array('!name' => $request['name']), 'error'));
       continue;
     }
@@ -319,9 +321,9 @@ function _pm_download_destination_lookup($type, $drupal_root, $sitepath, $create
  */
 function _pm_download_destination($type) {
   $drupal_root = drush_get_context('DRUSH_DRUPAL_ROOT');
-  $site_root = drush_get_context('DRUSH_DRUPAL_SITE_ROOT', FALSE);
-  $full_site_root = $drupal_root .'/'. $site_root;
-  $sitewide = drush_drupal_sitewide_directory();
+  $site_root = drush_get_context('DRUSH_DRUPAL_SITE_ROOT');
+  $full_site_root = empty($drupal_root) ? '' : $drupal_root .'/'. $site_root;
+  $sitewide = $drupal_root . '/' . drush_drupal_sitewide_directory();
 
   $in_site_directory = FALSE;
   // Check if we are running within the site directory.

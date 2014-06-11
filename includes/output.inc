@@ -111,7 +111,7 @@ function drush_format($input, $metadata = NULL, $format = NULL) {
     // override whatever is passed in via the $format parameter.
     $format = $metadata['format'];
   }
-  if (is_null(($format))) {
+  if (!isset($format)) {
     // TODO: we shouldn't ever call drush_get_option here.
     // Get rid of this once we confirm that there are no
     // callers that still need it.
@@ -156,7 +156,7 @@ function dt($string, $args = array()) {
   }
 
   // If Drupal's t() function unavailable.
-  if (is_null($output)) {
+  if (!isset($output)) {
     if (!empty($args)) {
       $output = strtr($string, $args);
     }
@@ -242,7 +242,7 @@ function drush_print_table($rows, $header = FALSE, $widths = array(), $handle = 
 function drush_format_table($rows, $header = FALSE, $widths = array(), $console_table_options = array()) {
   $tbl = _drush_format_table($rows, $header, $widths, $console_table_options);
   $output = $tbl->getTable();
-  if (!stristr(PHP_OS, 'WIN')) {
+  if (!drush_is_windows()) {
     $output = str_replace("\r\n", PHP_EOL, $output);
   }
   return $output;
@@ -250,8 +250,8 @@ function drush_format_table($rows, $header = FALSE, $widths = array(), $console_
 
 function _drush_format_table($rows, $header = FALSE, $widths = array(), $console_table_options = array()) {
   // Add defaults.
-  $console_table_options += array(CONSOLE_TABLE_ALIGN_LEFT , '');
   $tbl = new ReflectionClass('Console_Table');
+  $console_table_options += array(CONSOLE_TABLE_ALIGN_LEFT , '');
   $tbl = $tbl->newInstanceArgs($console_table_options);
 
   $auto_widths = drush_table_column_autowidth($rows, $widths);
@@ -704,8 +704,14 @@ function drush_print_file($file) {
  * @ingroup php_wrappers
  */
 function drush_json_encode($var) {
+  if (version_compare(phpversion(), '5.4.0', '>=')) {
+    $json = json_encode($var, JSON_PRETTY_PRINT);
+  }
+  else {
+    $json = json_encode($var);
+  }
   // json_encode() does not escape <, > and &, so we do it with str_replace().
-  return str_replace(array('<', '>', '&'), array('\u003c', '\u003e', '\u0026'), json_encode($var));
+  return str_replace(array('<', '>', '&'), array('\u003c', '\u003e', '\u0026'), $json);
 }
 
 /**

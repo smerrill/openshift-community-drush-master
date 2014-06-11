@@ -359,8 +359,13 @@ function _drush_invoke_hooks($command, $args) {
         $available_rollbacks[] = $func . '_rollback';
         $completed[] = $func;
         drush_log(dt("Calling hook !hook", array('!hook' => $func)), 'debug');
-        $result = call_user_func_array($func, $args);
-        drush_log(dt("Returned from hook !hook", array('!hook' => $func)), 'debug');
+        try {
+          $result = call_user_func_array($func, $args);
+          drush_log(dt("Returned from hook !hook", array('!hook' => $func)), 'debug');
+        }
+        catch (Exception $e) {
+          drush_set_error('DRUSH_EXECUTION_EXCEPTION', $e->getMessage());
+        }
         // If there is an error, break out of the foreach
         // $variations and foreach $callback_list
         if (drush_get_error() || ($result === FALSE)) {
@@ -572,12 +577,9 @@ function _drush_verify_cli_options($command) {
 
   // Next check to see if all required options were specified.
   $missing_required_options = array();
-  foreach ($command['options'] as $key => $value) {
-    if (is_array($value) && array_key_exists('required', $value)) {
-      $option_value = drush_get_option($key, NULL);
-      if (!isset($option_value)) {
-        $missing_required_options[] = $key;
-      }
+  foreach ($command['options'] as $option_name => $option) {
+    if (is_array($option) && !empty($option['required']) && drush_get_option($option_name, NULL) === NULL) {
+      $missing_required_options[] = $option_name;
     }
   }
   if (!empty($missing_required_options)) {
@@ -603,10 +605,16 @@ function _drush_verify_cli_arguments($command) {
     if ($required_arg_count === TRUE) {
       $required_arg_count = count($command['argument-description']);
     }
-    if ((count($command['arguments'])) < $required_arg_count) {
-      $missing = count($required_arg_count) > 1 ? dt('Missing required arguments') : dt('Missing required argument');
-      $required = implode("', '", array_keys($command['argument-description']));
-      return drush_set_error(dt("@missing: '@required'.  See `drush help @command` for information on usage.", array('@missing' => $missing, '@required' => $required, '@command' => $command['command'])));
+
+    if (count($command['arguments']) < $required_arg_count) {
+      $missing = $required_arg_count > 1 ? dt('Missing required arguments') : dt('Missing required argument');
+      $required = array_slice(array_keys($command['argument-description']), 0, $required_arg_count);
+
+      return drush_set_error(dt("@missing: '@required'.  See `drush help @command` for information on usage.", array(
+        '@missing' => $missing,
+        '@required' => implode("', '", $required),
+        '@command' => $command['command'],
+      )));
     }
   }
   return TRUE;
@@ -806,7 +814,7 @@ function drush_parse_args() {
   // be either 'help' or 'version' (the later if --version is specified)
   // @todo: it would be handy if one could do `drush @remote st --help` and
   // have that show help for st. Today, that shows --help for help command!
-  if (!sizeof($arguments)) {
+  if (!count($arguments)) {
     if (array_key_exists('version', $options)) {
       $arguments = array('version');
     }
@@ -945,7 +953,7 @@ function drush_adjust_args_if_shebang_script(&$args) {
 function drush_process_bootstrap_to_first_arg(&$arguments) {
   if (drush_get_option('bootstrap-to-first-arg', FALSE)) {
     $shift_alias_pos = 1 + (drush_get_context('DRUSH_SHEBANG_SCRIPT') === TRUE);
-    if (sizeof($arguments) >= $shift_alias_pos) {
+    if (count($arguments) >= $shift_alias_pos) {
       $shifted_alias = $arguments[$shift_alias_pos];
       $alias_record = drush_sitealias_get_record($shifted_alias);
       if (!empty($alias_record)) {
@@ -1040,10 +1048,12 @@ function drush_command_defaults($key, $commandfile, $path) {
     'drupal dependencies' => array(),
     'drush dependencies' => array(),
     'handle-remote-commands' => FALSE,
+    'remote-tty' => FALSE,
     'strict-option-handling' => FALSE,
     'bootstrap_errors' => array(),
     'topics' => array(),
     'hidden' => FALSE,
+    'category' => $commandfile,
   );
 }
 
@@ -1113,6 +1123,9 @@ function _drush_command_translate($source) {
  *   locally rather than remotely dispatched.  When this mode is set, the target site
  *   can be obtained via:
  *     drush_get_context('DRUSH_TARGET_SITE_ALIAS')
+ * - remote-tty: set to TRUE if Drush should force ssh to allocate a pseudo-tty
+ *   when this command is being called remotely.  Important for interactive commands.
+ *   Remote commands that allocate a psedo-tty always print "Connection closed..." when done.
  * - strict-option-handling: set to TRUE if drush should strictly separate local command
  *   cli options from the global options.  Usually, drush allows global cli options and
  *   command cli options to be interspersed freely on the commandline.  For commands where
@@ -1164,8 +1177,11 @@ function _drush_command_translate($source) {
  *       that should be used in table output.  Drush will automatically
  *       calculate the width of any field not listed here based on the length
  *       of the data items in it.
- * - engines: declares infocolumn-widthsrmation on Drush engines the command will load.
+ * - engines: declares information on Drush engines the command will load.
  *   Available engines can vary by command type.
+ *
+ * @return bool|array
+ *   A command definition.
  */
 function drush_parse_command() {
   $args = drush_get_arguments();
@@ -1195,8 +1211,8 @@ function drush_parse_command() {
 }
 
 /**
- * Called by drush_parse_command.  If a command is dispatched
- * directly by drush_dispatch, then drush_dispatch will call
+ * Called by drush_parse_command().  If a command is dispatched
+ * directly by drush_dispatch(), then drush_dispatch() will call
  * this function.
  */
 function _drush_prepare_command(&$command, $arguments = array()) {
@@ -1320,9 +1336,6 @@ function drush_command_normalize_name($command_name) {
  * - /drush and sites/all/drush in current Drupal site.
  * - Folders belonging to enabled modules in the current Drupal site.
  *
- * Commands implementing hook_drush_load() in MODULE.drush.load.inc with
- * a return value FALSE will not be loaded.
- *
  * A Drush command file is a file that matches "*.drush.inc".
  *
  * @see drush_scan_directory()
@@ -1441,12 +1454,12 @@ function _drush_add_commandfiles($searchpath, $phase = NULL, $reset = FALSE) {
 
   $cache =& drush_get_context('DRUSH_COMMAND_FILES', array());
 
-  if (sizeof($searchpath)) {
+  if (count($searchpath)) {
     if (!$reset) {
       // Assemble a cid specific to the bootstrap phase and searchpaths.
       // Bump $cf_version when making a change to a dev version of Drush
       // that invalidates the commandfile cache.
-      $cf_version = 2;
+      $cf_version = 3;
       $cid = drush_get_cid('commandfiles-' . $phase, array(), array_merge($searchpath, array($cf_version)));
       $command_cache = drush_cache_get($cid);
       if (isset($command_cache->data)) {
@@ -1506,17 +1519,6 @@ function _drush_add_commandfiles($searchpath, $phase = NULL, $reset = FALSE) {
         if (!empty($drupal_version) && ($drupal_version != drush_drupal_major_version())) {
           $load_command = FALSE;
         }
-        else {
-          $load_test_inc = dirname($filename) . "/" . $module . ".drush.load.inc";
-          if (file_exists($load_test_inc)) {
-            include_once($load_test_inc);
-            $module_versionless = preg_replace('/\.d([0-9]+)$/', '', $module);
-            $load_test_func = $module_versionless . "_drush_load";
-            if (function_exists($load_test_func)) {
-              $load_command = $load_test_func($phase);
-            }
-          }
-        }
         if ($load_command) {
           // Only try to require if the file exists. If not, a file from the
           // command file cache may not be available anymore, in which case
@@ -1542,14 +1544,14 @@ function _drush_add_commandfiles($searchpath, $phase = NULL, $reset = FALSE) {
       }
     }
 
-    if (sizeof($list)) {
+    if (count($list)) {
       ksort($cache);
     }
   }
 }
 
 /**
- * Substrings to ignore during commandfile searching.
+ * Substrings to ignore during commandfile and site alias searching.
  */
 function drush_filename_blacklist() {
   $blacklist = array('.', '..', 'drush_make', 'examples', 'tests', 'disabled', 'gitcache', 'cache');
@@ -1558,6 +1560,7 @@ function drush_filename_blacklist() {
       $blacklist[] = 'drush' . $v;
     }
   }
+  $blacklist = array_merge($blacklist, drush_get_option_list('exclude'));
   return $blacklist;
 }
 
@@ -1600,19 +1603,19 @@ function drush_command_get_includes($command) {
  */
 function drush_command_default_options($command = NULL) {
   $command_default_options = drush_get_context('command-specific');
-  return drush_command_set_command_specific($command_default_options, $command);
+  drush_command_set_command_specific($command_default_options, $command);
 }
 
 function drush_sitealias_command_default_options($site_record, $prefix, $command = NULL) {
   if (isset($site_record) && array_key_exists($prefix . 'command-specific', $site_record)) {
-    return drush_command_set_command_specific($site_record[$prefix . 'command-specific'], $command);
+    drush_command_set_command_specific($site_record[$prefix . 'command-specific'], $command);
   }
   return FALSE;
 }
 
 function drush_command_set_command_specific_options($prefix, $command = NULL) {
   $command_default_options = drush_get_option($prefix . 'command-specific', array());
-  return drush_command_set_command_specific($command_default_options, $command);
+  drush_command_set_command_specific($command_default_options, $command);
 }
 
 function drush_command_set_command_specific($command_default_options, $command = NULL) {

@@ -123,7 +123,7 @@ function drush_shell_exec_interactive($cmd) {
  */
 function _drush_shell_exec($args, $interactive = FALSE) {
   // Do not change the command itself, just the parameters.
-  for ($x = 1; $x < sizeof($args); $x++) {
+  for ($x = 1; $x < count($args); $x++) {
     $args[$x] = drush_escapeshellarg($args[$x]);
   }
   // Important: we allow $args to take one of two forms here.  If
@@ -374,7 +374,7 @@ function _drush_escapeshellarg_linux($arg) {
  * Stores output for the most recent shell command.
  * This should only be run from drush_shell_exec().
  *
- * @param $output
+ * @param array|bool $output
  *   The output of the most recent shell command.
  *   If this is not set the stored value will be returned.
  */

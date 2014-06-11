@@ -1,14 +1,15 @@
 <?php
 
-/**
- * @file
- *   Tests for archive-dump and archive-restore
- * @group commands
- */
+namespace Unish;
 
 require_once dirname(__FILE__) . '/../includes/filesystem.inc';
 
-class archiveDumpCase extends Drush_CommandTestCase {
+/**
+ * Tests for archive-dump and archive-restore
+ *
+ * @group commands
+ */
+class archiveDumpCase extends CommandUnishTestCase {
   /**
    * archive-dump behaves slightly different when archiving a site installed
    * at sites/default so we make the test to use sites/default as the
@@ -20,7 +21,8 @@ class archiveDumpCase extends Drush_CommandTestCase {
    * Install a site and dump it to an archive.
    */
   private function archiveDump($no_core) {
-    $this->fetchInstallDrupal(self::uri, TRUE, UNISH_DRUPAL_MAJOR_VERSION);
+    $profile = UNISH_DRUPAL_MAJOR_VERSION >= 7 ? 'testing' : 'default';
+    $this->fetchInstallDrupal(self::uri, TRUE, UNISH_DRUPAL_MAJOR_VERSION, $profile);
     $root = $this->webroot();
     $dump_dest = UNISH_SANDBOX . DIRECTORY_SEPARATOR . 'dump.tar.gz';
     $options = array(
@@ -43,7 +45,7 @@ class archiveDumpCase extends Drush_CommandTestCase {
    */
   private function unTar($dump_dest) {
     $untar_dest = UNISH_SANDBOX . DIRECTORY_SEPARATOR . 'untar';
-    unish_file_delete_recursive($untar_dest);
+    unish_file_delete_recursive($untar_dest, TRUE);
     $tar = self::get_tar_executable();
     $exec = sprintf("mkdir %s && cd %s && $tar -xzf %s", $untar_dest, $untar_dest, $dump_dest);
     $this->execute($exec);
@@ -106,7 +108,8 @@ class archiveDumpCase extends Drush_CommandTestCase {
     $docroot = basename($this->webroot());
     $this->assertFileExists($untar_dest . '/MANIFEST.ini');
     $this->assertFileExists($untar_dest . '/' . $docroot);
-    $this->assertFileNotExists($untar_dest . '/' . $docroot . '/modules', 'No modules directory should exist with --no-core');
+    $modules_dir = UNISH_DRUPAL_MAJOR_VERSION >= 8 ? '/core/modules' : '/modules';
+    $this->assertFileNotExists($untar_dest . '/' . $docroot . $modules_dir, 'No modules directory should exist with --no-core');
 
     return $dump_dest;
   }
@@ -119,7 +122,7 @@ class archiveDumpCase extends Drush_CommandTestCase {
   public function testArchiveRestoreNoCore($dump_dest) {
     $root = $this->webroot();
     $original_codebase = drush_dir_md5($root);
-    unish_file_delete_recursive($root . '/sites/' . self::uri);
+    unish_file_delete_recursive($root . '/sites/' . self::uri, TRUE);
     $options = array(
       'yes' => NULL,
       'destination' => $root,

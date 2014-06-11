@@ -40,10 +40,15 @@ function drush_drupal_version($drupal_root = NULL) {
 }
 
 function drush_drupal_cache_clear_all() {
-  $prior = drush_get_context('DRUSH_AFFIRMATIVE');
-  drush_set_context('DRUSH_AFFIRMATIVE', TRUE);
-  drush_invoke('cache-clear', 'all');
-  drush_set_context('DRUSH_AFFIRMATIVE', $prior);
+  if (drush_drupal_major_version() >= 8) {
+    drush_invoke('cache-rebuild');
+  }
+  else {
+    $prior = drush_get_context('DRUSH_AFFIRMATIVE');
+    drush_set_context('DRUSH_AFFIRMATIVE', TRUE);
+    drush_invoke('cache-clear', 'all');
+    drush_set_context('DRUSH_AFFIRMATIVE', $prior);
+  }
 }
 
 /**
@@ -73,7 +78,7 @@ function system_watchdog($log_entry) {
   }
   else {
     drush_include_engine('drupal', 'environment');
-    $levels = core_watchdog_severity_levels();
+    $levels = drush_watchdog_severity_levels();
     $severity = $levels[$log_entry['severity']];
   }
   // Format the message.
@@ -114,7 +119,7 @@ function system_watchdog($log_entry) {
  * of the update process to the logging system.
  */
 function _drush_log_update_sql($ret) {
-  if (sizeof($ret)) {
+  if (count($ret)) {
     foreach ($ret as $info) {
       if (is_array($info)) {
         if (!$info['success']) {
