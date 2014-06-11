@@ -5,6 +5,8 @@ Drush is a command line shell and Unix scripting interface for Drupal.  If you a
 
 Drush core ships with lots of useful commands for interacting with code like modules/themes/profiles. Similarly, it runs update.php, executes sql queries and DB migrations, and misc utilities like run cron or clear cache.
 
+[![Latest Stable Version](https://poser.pugx.org/drush/drush/v/stable.png)](https://packagist.org/packages/drush/drush) [![Total Downloads](https://poser.pugx.org/drush/drush/downloads.png)](https://packagist.org/packages/drush/drush) [![Latest Unstable Version](https://poser.pugx.org/drush/drush/v/unstable.png)](https://packagist.org/packages/drush/drush) [![License](https://poser.pugx.org/drush/drush/license.png)](https://packagist.org/packages/drush/drush)
+
 DRUSH VERSIONS
 --------------
 
@@ -12,8 +14,8 @@ Each version of Drush supports multiple Drupal versions.  Drush 6 is recommended
 
 Drush Version | Branch  | PHP | Compatible Drupal versions | Code Status
 ------------- | ------  | --- | -------------------------- | -----------
-Drush 7       | [master](https://travis-ci.org/drush-ops/drush)  | 5.3.3+ | D6, D7, D8                 | <img src="https://travis-ci.org/drush-ops/drush.png?branch=master">
-Drush 6       | [6.x](https://travis-ci.org/drush-ops/drush) | 5.3.3+ | D6, D7                     | <img src="https://travis-ci.org/drush-ops/drush.png?branch=6.x">
+Drush 7       | [master](https://travis-ci.org/drush-ops/drush)  | 5.3.0+ | D6, D7, D8                 | <img src="https://travis-ci.org/drush-ops/drush.png?branch=master">
+Drush 6       | [6.x](https://travis-ci.org/drush-ops/drush) | 5.3.0+ | D6, D7                     | <img src="https://travis-ci.org/drush-ops/drush.png?branch=6.x">
 Drush 5       | [5.x](https://travis-ci.org/drush-ops/drush) | 5.2.0+ | D6, D7                     | <img src="https://travis-ci.org/drush-ops/drush.png?branch=5.x">
 Drush 4       | 4.x | 5.2.0+ | D5, D6, D7                 | Unsupported
 Drush 3       | 3.x | 5.2.0+ | D5, D6                     | Unsupported
@@ -35,7 +37,7 @@ For even more documentation, use the 'topic' command:
 
     $ drush topic
 
-Installation instructions can be found below.  For a full list of Drush commands 
+Installation instructions can be found below.  For a full list of Drush commands
 and documentation by version, visit http://www.drush.org.
 
 
@@ -53,6 +55,7 @@ pursuing one of the support options below.
 MISC
 -----------
 * [www.drush.org](http://www.drush.org)
+* Subscribe to https://github.com/drush-ops/drush/releases.atom to receive notification on new releases.
 * [A list of modules that include Drush integration](http://drupal.org/project/modules?filters=tid%3A4654)
 * For more information, please see the [Resources](http://drush.org/resources) and the [Drush FAQ](http://drupal.org/drush-faq). Run the `drush topic` command for even more help.
 * If you are using Debian or Ubuntu, you can alternatively use the Debian packages uploaded in your distribution. You may need to use the backports to get the latest version, if you are running a LTS or "stable" release.
@@ -61,36 +64,54 @@ MISC
 REQUIREMENTS
 -----------
 
-* To use Drush, you'll need a command line PHP version 5.3.3+.
 * Drush commands that work with git require git 1.7 or greater.
 * Drush works best on a Unix-like OS (Linux, OS X)
 * Most Drush commands run on Windows.  See INSTALLING DRUSH ON WINDOWS, below.
 
-INSTALL - PEAR
------------
-If you have trouble with PEAR installation, consider trying MANUAL INSTALLATION. It is not too hard.
+INSTALL/UPDATE - COMPOSER
+------------------
 
-```bash
-pear channel-discover pear.drush.org
-pear install drush/drush
+* [Install Composer globally](http://getcomposer.org/doc/00-intro.md#system-requirements) (if needed).
+* Make sure Composer's global bin directory is on the system PATH (recommended):
+
+        sed -i '1i export PATH="$HOME/.composer/vendor/bin:$PATH"' $HOME/.bashrc
+        source $HOME/.bashrc
+
+* To install Drush 6.x (stable):
+
+        composer global require drush/drush:6.*
+
+* To install Drush 7.x (dev) which is required for Drupal 8:
+
+        composer global require drush/drush:dev-master
+
+* To update to a newer version (what you get depends on your specification in ~/.composer/composer.json):
+
+        composer global update
+
+* Alternate commands to install some other variant of Drush:
+
+        # Install a specific version of Drush, e.g. Drush 6.1.0
+        composer global require drush/drush:6.1.0
+        # Master branch as a git clone. Great for contributing back to Drush project.
+        composer global require drush/drush:dev-master --prefer-source
+
+[Fuller explanation of the require command.](http://getcomposer.org/doc/03-cli.md#require)
+
+**Tips:**
+
+If Drush cannot find an autoloaded class, run `composer self-update`. Drush often
+tracks composer changes closely, so you may have some problems if you are not
+running a recent version.
+
+If composer cannot find a requirement, and suggests that *The package is not available in a stable-enough version according to your minimum-stability setting*, then place the following
+in `$HOME/.composer/composer.json`:
 ```
-
-_Tip: Use sudo to overcome permission problems.  If the channel-discover fails, try running the following sequence of commands:_
-
-```bash
-pear upgrade --force Console_Getopt
-pear upgrade --force pear
-pear upgrade-all
+{
+  "minimum-stability": "dev"
+}
 ```
-
-To update, run `pear upgrade drush/drush`
-
-To get alternate drush versions, replace that last line with one of the below that matches your fancy.
-
-```bash
-pear install drush/drush-5.0.0
-pear install drush/drush-6.0.0RC4
-```
+Merge this in with any other content that may already exist in this file.
 
 See the POST-INSTALL section for configuration tips.
 
@@ -98,10 +119,10 @@ INSTALL - MANUAL
 -----------
 1. Place the uncompressed drush.tar.gz, drush.zip, or cloned git repository in a directory that is outside of your web root.
 1. Make the 'drush' command executable:
-    
+
     `$ chmod u+x /path/to/drush/drush`
 
-1. Configure your system to recognize where Drush resides. There are 2 options:
+1. Configure your system to recognize where Drush resides. There are 3 options:
     1. Create a symbolic link to the Drush executable in a directory that is already in your PATH, e.g.:
 
          `$ ln -s /path/to/drush/drush /usr/bin/drush`
@@ -112,17 +133,24 @@ INSTALL - MANUAL
 
      Your system will search path options from left to right until it finds a result.
 
-     To apply your changes to your current session, either log out and then log
-     back in again, or re-load your bash configuration file, i.e.:
+    1. Add an alias for drush (this method can also be handy if you want to use 2 versions of Drush, for example Drush 5 or 6 (stable) for Drupal 7 development, and Drush 7 (master) for Drupal 8 development).
+     To add an alias to your Drush 7 executable, add this to you shell configuration file (see list in previous option):
+         `$ alias drush-master=/path/to/drush/drush`
 
-        `$ source .bashrc`
+    For options 2 and 3 above, in order to apply your changes to your current session, either log out and then log back in again, or re-load your bash configuration file, i.e.:
 
-     NOTE: If you do not follow step 3, you will need to inconveniently run Drush commands using the full path to the executable "/path/to/drush/drush" or by navigating to /path/to/drush and running "./drush". The -r or -l options will be required (see USAGE, below).
+      `$ source .bashrc`
+
+    NOTE: If you do not follow this step, you will need to inconveniently run Drush commands using the full path to the executable "/path/to/drush/drush" or by navigating to /path/to/drush and running "./drush". The -r or -l options will be required (see USAGE, below).
 
 1. Test that Drush is found by your system:
 
      `$ which drush`
-     
+
+1. From Drush root, run Composer to fetch dependencies.
+
+     `$ composer install`
+
 See the POST-INSTALL section for configuration tips.
 
 POST-INSTALL
@@ -149,7 +177,7 @@ POST-INSTALL
    Putting this in a .bashrc/.bash_profile/.profile would produce this prompt:
 
      `msonnabaum@hostname ~/repos/drush (master)[@sitename]$`
-     
+
 1. Help the Drush development team by sending anonymized usage statistics.  To automatically send usage data, please add the following to a .drushrc.php file:
 
        ```php
@@ -158,9 +186,9 @@ POST-INSTALL
        ```
 
      Stats are usually logged locally and sent whenever log file exceeds 50Kb.
-     Alternatively, one may disable automatic sending and instead use 
+     Alternatively, one may disable automatic sending and instead use
      `usage-show` and `usage-send` commands to more carefully send data.
-     
+
 
 ADDITIONAL CONFIGURATIONS FOR MAMP:
 -----------------------------------
@@ -274,6 +302,14 @@ magic_quotes_runtime = Off
 magic_quotes_sybase = Off
 ```
 
+CONFIGURING DRUSH FOR PHP 5.5
+-----------------------------
+
+If you are running on Linux, you may find that you need
+the php5-json package.  On Ubuntu, you can install it via:
+
+`apt-get install php5-json`
+
 INSTALLING DRUSH ON WINDOWS:
 ----------------------------
 
@@ -358,7 +394,7 @@ servers.  Once defined, aliases can be references with the @ nomenclature, i.e.
 # Synchronize staging files to production
 $ drush rsync @staging:%files/ @live:%files
 # Syncronize database from production to dev, excluding the cache table
-$ drush sql-sync --structure-tables-key=custom --no-cache @live @dev
+$ drush sql-sync --structure-tables-key=custom @live @dev
 ```
 
 See http://drupal.org/node/670460 and [example.aliases.drushrc.php](examples/example.aliases.drushrc.php) for more

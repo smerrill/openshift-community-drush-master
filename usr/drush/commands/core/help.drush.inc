@@ -58,11 +58,13 @@ function drush_print_help($command) {
   // Print command sections help.
   foreach ($command['sections'] as $key => $value) {
     if (!empty($command[$key])) {
-      drush_print(dt($value) . ':');
       $rows = drush_format_help_section($command, $key);
-      drush_print_table($rows, FALSE, array('label' => 40));
-      unset($rows);
-      drush_print();
+      if ($rows) {
+        drush_print(dt($value) . ':');
+        drush_print_table($rows, FALSE, array('label' => 40));
+        unset($rows);
+        drush_print();
+      }
     }
   }
 
@@ -124,9 +126,11 @@ function _drush_help_merge_subcommand_information(&$command) {
  * @param $section
  *   The name of the section to format ('options', 'topic', etc.)
  * @returns array
- *   Formatted rows, suitable for printing via drush_print_table.
+ *   Formatted rows, suitable for printing via drush_print_table. The returned
+ *   array can be empty.
  */
 function drush_format_help_section($command, $section) {
+  $rows = array();
   $formatter = (function_exists('drush_help_section_formatter_' . $section)) ? 'drush_help_section_formatter_' . $section : 'drush_help_section_default_formatter';
   foreach ($command[$section] as $name => $help_attributes) {
     if (!is_array($help_attributes)) {
@@ -134,7 +138,7 @@ function drush_format_help_section($command, $section) {
     }
     $help_attributes['label'] = $name;
     call_user_func_array($formatter, array($command, &$help_attributes));
-    if (!array_key_exists('hidden', $help_attributes)) {
+    if (empty($help_attributes['hidden'])) {
       $rows[] = array('label' => $help_attributes['label'], 'description' => $help_attributes['description']);
       // Process the subsections too, if any
       if (!empty($command['sub-' . $section]) && array_key_exists($name, $command['sub-' . $section])) {
@@ -195,7 +199,7 @@ function drush_help_section_formatter_options($command, &$help_attributes) {
   else {
     $help_attributes['label'] = '--' . $help_attributes['label'];
   }
-  if (array_key_exists('required', $help_attributes)) {
+  if (!empty($help_attributes['required'])) {
     $help_attributes['description'] .= " " . dt("Required.");
   }
 
@@ -302,14 +306,18 @@ function drush_core_help() {
 
     // Make a fake command section to hold the global options, then print it.
     $global_options_help = drush_global_options_command(TRUE);
-    if (!in_array($format, array('html', 'export', 'json')) && !drush_get_option('filter')) {
+    if (!in_array($format, array('html', 'var_export', 'json')) && !drush_get_option('filter')) {
       drush_print_help($global_options_help);
     }
 
-    if ($format == 'json' || $format == 'export') {
-      // Print giant array and return.
+    if ($format == 'json' || $format == 'var_export') {
+      // Print giant array, and set backend_result. We do it this way because this command
+      // isn't yet fully compliant with outputformat system. To do so, we need to deal with
+      // the fact that this command varies output significantly when showing help for one
+      // command versus a listing. We also have oddball HTML format.
       drush_print(drush_format($command_categories, 'commands'));
-      return $command_categories;
+      drush_backend_set_result($command_categories);
+      return NULL;
     }
     else {
       // HTML and CLI command listing (in a table).
@@ -385,7 +393,7 @@ function drush_help_categorize($implemented) {
   $category_map = array();
   foreach ($implemented as $key => $candidate) {
     if ((!array_key_exists('is_alias', $candidate) || !$candidate['is_alias']) && !$candidate['hidden']) {
-      $category = $candidate['commandfile'];
+      $category = $candidate['category'];
       // If we have decided to remap a category, remap every command
       if (array_key_exists($category, $category_map)) {
         $category = $category_map[$category];
@@ -412,6 +420,7 @@ function drush_help_categorize($implemented) {
           $command_categories[$category]['summary'] = $summary[0];
         }
       }
+      $candidate['category'] = $category;
       $command_categories[$category]['commands'][$key] = $candidate;
     }
   }

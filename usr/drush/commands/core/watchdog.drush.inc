@@ -5,6 +5,10 @@
  */
 function watchdog_drush_help($section) {
   switch ($section)  {
+    case 'meta:watchdog:title':
+      return dt('Watchdog commands');
+    case 'meta:watchdog:summary':
+      return dt('Interact with Drupal\'s db logging system.');
     case 'drush:watchdog-list':
       return dt('Show available message types and severity levels. A prompt will ask for a choice to show watchdog messages.');
     case 'drush:watchdog-show':
@@ -88,23 +92,23 @@ function watchdog_drush_command() {
  * Command callback.
  */
 function drush_core_watchdog_list() {
+  drush_include_engine('drupal', 'environment');
+
   $options['-- types --'] = dt('== message types ==');
-  $types = core_watchdog_message_types();
-  foreach ($types as $type) {
-    $options[] = $type;
+  $types = drush_watchdog_message_types();
+  foreach ($types as $key => $type) {
+    $options[$key] = $type;
   }
   $options['-- levels --'] = dt('== severity levels ==');
-  drush_include_engine('drupal', 'environment');
-  $severities = core_watchdog_severity_levels();
+  $severities = drush_watchdog_severity_levels();
   foreach ($severities as $key => $value) {
-    $options[] = "$value($key)";
+    $options[$key] = "$value($key)";
   }
   $option = drush_choice($options, dt('Select a message type or severity level.'));
   if ($option === FALSE) {
     return drush_user_abort();
   }
-  $ntypes = count($types);
-  if ($option < $ntypes) {
+  if (isset($types[$option])) {
     drush_set_option('type', $types[$option]);
   }
   else {
@@ -117,6 +121,8 @@ function drush_core_watchdog_list() {
  * Command callback.
  */
 function drush_core_watchdog_show($arg = NULL) {
+  drush_include_engine('drupal', 'environment');
+
   if (is_numeric($arg)) {
     return drush_core_watchdog_show_one($arg);
   }
@@ -231,8 +237,7 @@ function drush_core_watchdog_show_many($filter = NULL) {
  */
 function core_watchdog_format_result($result, $extended = FALSE) {
   // Severity.
-  drush_include_engine('drupal', 'environment');
-  $severities = core_watchdog_severity_levels();
+  $severities = drush_watchdog_severity_levels();
   $result->severity = $severities[$result->severity];
 
   // Date.
@@ -282,6 +287,8 @@ function core_watchdog_format_result($result, $extended = FALSE) {
  *   The id of the message to delete or 'all'.
  */
 function drush_core_watchdog_delete($arg = NULL) {
+  drush_include_engine('drupal', 'environment');
+
   if ($arg == 'all') {
     drush_print(dt('All watchdog messages will be deleted.'));
     if (!drush_confirm(dt('Do you really want to continue?'))) {
@@ -306,7 +313,7 @@ function drush_core_watchdog_delete($arg = NULL) {
   else {
     $type = drush_get_option('type');
     $severity = drush_get_option('severity');
-    if ((is_null($arg))&&(is_null($type))&&(is_null($severity))) {
+    if ((!isset($arg))&&(!isset($type))&&(!isset($severity))) {
       return drush_set_error(dt('No options provided.'));
     }
     $where = core_watchdog_query($type, $severity, $arg, 'OR');
@@ -341,7 +348,7 @@ function core_watchdog_query($type = NULL, $severity = NULL, $filter = NULL, $cr
   $args = array();
   $conditions = array();
   if ($type) {
-    $types = core_watchdog_message_types();
+    $types = drush_watchdog_message_types();
     if (array_search($type, $types) === FALSE) {
       $msg = "Unrecognized message type: !type.\nRecognized types are: !types.";
       return drush_set_error('WATCHDOG_UNRECOGNIZED_TYPE', dt($msg, array('!type' => $type, '!types' => implode(', ', $types))));
@@ -349,9 +356,8 @@ function core_watchdog_query($type = NULL, $severity = NULL, $filter = NULL, $cr
     $conditions[] = "type = :type";
     $args[':type'] = $type;
   }
-  if (!is_null($severity)) {
-    drush_include_engine('drupal', 'environment');
-    $severities = core_watchdog_severity_levels();
+  if (isset($severity)) {
+    $severities = drush_watchdog_severity_levels();
     if (isset($severities[$severity])) {
       $level = $severity;
     }
@@ -379,14 +385,4 @@ function core_watchdog_query($type = NULL, $severity = NULL, $filter = NULL, $cr
   $where = implode(" $criteria ", $conditions);
 
   return array('where' => $where, 'args' => $args);
-}
-
-/**
- * Helper function to obtain the message types based on drupal version.
- *
- * @return
- *   Array of watchdog message types.
- */
-function core_watchdog_message_types() {
-  return _dblog_get_message_types();
 }

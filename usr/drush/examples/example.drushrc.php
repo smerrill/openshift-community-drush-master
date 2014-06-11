@@ -1,7 +1,9 @@
 <?php
 
 /**
+ * @file
  * Examples of valid statements for a Drush runtime config (drushrc) file.
+ *
  * Use this file to cut down on typing out lengthy and repetitive command line
  * options in the Drush commands you use and to avoid mistakes.
  *
@@ -92,7 +94,13 @@
 # $options['cache'] = TRUE;
 
 // Load a drushrc.php configuration file from the current working directory.
-# $options['config'][] = '.';
+# $options['config'][] = './drushrc.php';
+// Load a drushrc.php configuration file from the directory sites/all/drush,
+// relative to the current Drupal site.
+# $root = drush_get_context('DRUSH_SELECTED_DRUPAL_ROOT');
+# if ($root) {
+#   $options['config'][] = $root . "/sites/all/drush/drushrc.php";
+# }
 
 /**
  * Enable logging and periodic upload of anonymized usage statistics. The Drush
@@ -301,10 +309,11 @@
  * git repository.  Example script below by Grayside.  Customize as desired.
  * @see: http://grayside.org/node/93.
  */
-#exec('git rev-parse --show-toplevel 2> /dev/null', $output);
-#if (!empty($output)) {
-#  $repo = $output[0];
-#  $options['config'] = $repo . '/drush/drushrc.php';
-#  $options['include'] = $repo . '/drush/commands';
-#  $options['alias-path'] = $repo . '/drush/aliases';
+#$repo_dir = drush_get_option('root') ? drush_get_option('root') : getcwd();
+#if (drush_shell_exec('cd %s && git rev-parse --show-toplevel 2> ' . drush_bit_bucket(), $repo_dir)) {
+#  $output = drush_shell_exec_output();
+#  $repo_top = $output[0];
+#  $options['config'] = $repo_top . '/drush/drushrc.php';
+#  $options['include'] = $repo_top . '/drush/commands';
+#  $options['alias-path'] = $repo_top . '/drush/aliases';
 #}
